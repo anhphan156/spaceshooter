@@ -1,12 +1,12 @@
-use raylib::prelude::*;
+use game::Game;
+
+pub mod component;
+pub mod entity;
+pub mod game;
+pub mod system;
+pub mod util;
 
 fn main() {
-    let (mut rl, thread) = raylib::init().size(640, 480).title("Hello, World").build();
-
-    while !rl.window_should_close() {
-        let mut d = rl.begin_drawing(&thread);
-
-        d.clear_background(Color::WHITE);
-        d.draw_text("Hello, world!", 12, 12, 20, Color::BLACK);
-    }
+    let mut game = Game::new();
+    game.run();
 }
