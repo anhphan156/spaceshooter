@@ -25,33 +25,37 @@
           inherit system overlays;
         };
 
-        dep = with pkgs; [ libclang ];
+        clang_lib = with pkgs; [
+          libclang 
+        ];
+
+        x11_lib = with pkgs; [
+          libGL
+          wayland
+          wayland-protocols
+          libxkbcommon
+          xorg.libX11
+          xorg.libXrandr
+          xorg.libXinerama
+          xorg.libXcursor
+          xorg.libXi
+          xorg.libXext
+        ];
       in
         with pkgs; {
           devShells.default = mkShell {
             RUST_BACKTRACE = 1;
-            LIBCLANG_PATH = lib.makeLibraryPath dep;
+            LIBCLANG_PATH = lib.makeLibraryPath clang_lib;
+            LD_LIBRARY_PATH = lib.makeLibraryPath x11_lib;
             packages = [
               pkg-config
               cmake
               rust-toolchain
               glfw
               glfw-wayland
+              glxinfo
             ];
-            buildInputs = [
-              clang
-              libGL
-              libclang
-              wayland
-              wayland-protocols
-              libxkbcommon
-              xorg.libX11
-              xorg.libXrandr
-              xorg.libXinerama
-              xorg.libXcursor
-              xorg.libXi
-              xorg.libXext
-            ];
+            buildInputs = [ pkgs.clang ] ++ clang_lib ++ x11_lib ;
           };
         }
     );
