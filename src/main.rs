@@ -1,10 +1,4 @@
-use game::Game;
-
-pub mod component;
-pub mod entity;
-pub mod game;
-pub mod system;
-pub mod util;
+use spaceshooter::game::Game;
 
 fn main() {
     let mut game = Game::new();
