@@ -6,14 +6,15 @@ use crate::{
 };
 use raylib::prelude::*;
 
-pub struct Game {
+pub struct Game<'a> {
     rl: RaylibHandle,
     thread: RaylibThread,
     scenes: HashMap<u8, Box<dyn Scene>>,
+    current_scene: Option<&'a mut Box<dyn Scene>>,
 }
 
-impl Game {
-    pub fn new() -> Self {
+impl<'a> Game<'a> {
+    pub fn new() -> Game<'a> {
         let (mut rl, thread) = raylib::init()
             .size(WINDOW_WIDTH as i32, WINDOW_HEIGHT as i32)
             .title(WINDOW_TITLE)
@@ -27,15 +28,30 @@ impl Game {
         let mut scenes: HashMap<u8, Box<dyn Scene>> = HashMap::new();
         scenes.insert(0, mario_scene);
 
-        Game { rl, thread, scenes }
+        Game {
+            rl,
+            thread,
+            scenes,
+            current_scene: None,
+        }
     }
 
-    pub fn run(&mut self) {
-        let current_scene: &mut Box<dyn Scene> = self.scenes.get_mut(&0).unwrap();
+    #[allow(dead_code)]
+    fn change_scene(&'a mut self, name: u8) {
+        self.current_scene = self.scenes.get_mut(&name);
+    }
+
+    pub fn run(&'a mut self) {
+        self.current_scene = self.scenes.get_mut(&0);
+
         while !self.rl.window_should_close() {
             let dt = self.rl.get_frame_time();
             let mut d = self.rl.begin_drawing(&self.thread);
-            current_scene.update(&mut d, dt);
+            if let Some(scene) = &mut self.current_scene {
+                scene.update(&mut d, dt);
+            } else {
+                panic!("No scene selected");
+            }
         }
     }
 }
