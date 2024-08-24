@@ -2,11 +2,6 @@ use crate::component::ctransform::CTransform;
 
 pub mod entity_manager;
 
-enum Tag {
-    Recyclable(String),
-    UnRecyclable(String),
-}
-
 #[allow(unused)]
 #[derive(Clone)]
 pub struct Entity {
