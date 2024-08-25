@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use crate::component::{cshape::CShape, ctransform::CTransform};
 
 pub mod entity_manager;

@@ -1,3 +1,5 @@
+use std::{cell::RefCell, rc::Rc};
+
 use glam::Vec2;
 use raylib::{
     color::Color,
@@ -15,8 +17,10 @@ use crate::{
 
 use super::Scene;
 
+#[allow(dead_code)]
 pub struct MarioScene {
     pub entity_manager: EntityManager,
+    player: Rc<RefCell<Entity>>,
     center: (i32, i32),
     offset: f32,
     cd: f32,
@@ -24,11 +28,14 @@ pub struct MarioScene {
 
 impl MarioScene {
     pub fn new() -> MarioScene {
-        let entity_manager = EntityManager::new();
+        let mut entity_manager = EntityManager::new();
         let center = (WINDOW_WIDTH as i32 / 2, WINDOW_HEIGHT as i32 / 2);
+
+        let player = MarioScene::spawn_player(&mut entity_manager);
 
         MarioScene {
             entity_manager,
+            player,
             center,
             offset: 0.0,
             cd: 0.0,
@@ -52,15 +59,20 @@ impl MarioScene {
         );
     }
 
-    fn move_entities(entities: &mut Vec<Entity>, dt: f32) {
+    fn move_entities(entities: &mut Vec<Rc<RefCell<Entity>>>, dt: f32) {
         for e in entities.iter_mut() {
-            if e.is_alive() {
-                e.c_transform.position += e.c_transform.velocity * dt;
+            let vec;
+            {
+                vec = e.borrow().c_transform.velocity;
+            }
+            if e.borrow().is_alive() {
+                e.borrow_mut().c_transform.position += vec * dt;
             }
         }
     }
-    fn render(entities: &Vec<Entity>, d: &mut RaylibDrawHandle) {
+    fn render(entities: &Vec<Rc<RefCell<Entity>>>, d: &mut RaylibDrawHandle) {
         for e in entities.iter() {
+            let e = e.borrow();
             if e.is_alive() {
                 let position = e.c_transform.position;
                 match e.c_shape.shape {
@@ -68,8 +80,8 @@ impl MarioScene {
                         d.draw_circle(position.x as i32, position.y as i32, r, e.c_shape.color)
                     }
                     Shape::Rectangle(w, h) => d.draw_rectangle(
-                        position.x as i32,
-                        position.y as i32,
+                        position.x as i32 - w / 2,
+                        position.y as i32 - h / 2,
                         w,
                         h,
                         e.c_shape.color,
@@ -78,8 +90,9 @@ impl MarioScene {
             }
         }
     }
-    fn check_out_of_bound(entities: &mut Vec<Entity>) {
+    fn check_out_of_bound(entities: &mut Vec<Rc<RefCell<Entity>>>) {
         for e in entities.iter_mut() {
+            let mut e = e.borrow_mut();
             if !e.is_alive() {
                 continue;
             }
@@ -92,6 +105,8 @@ impl MarioScene {
             }
         }
     }
+
+    #[allow(dead_code)]
     fn shoot(&mut self, dt: f32) {
         self.offset += 1.0;
         if self.cd > 0.0 {
@@ -108,6 +123,7 @@ impl MarioScene {
             let velocity = Vec2::new(f32::cos(theta + self.offset), f32::sin(theta + self.offset));
 
             let e = self.entity_manager.add_entity("ball".to_string());
+            let mut e = e.borrow_mut();
             e.c_transform = CTransform {
                 position: velocity + center,
                 velocity: velocity * 200.0,
@@ -121,6 +137,26 @@ impl MarioScene {
             theta += angle;
         }
     }
+
+    fn spawn_player(entity_manager: &mut EntityManager) -> Rc<RefCell<Entity>> {
+        let position = Vec2::new(WINDOW_WIDTH as f32 / 2.0, WINDOW_HEIGHT as f32 / 2.0);
+
+        let player = entity_manager.add_entity("Player".to_string());
+        {
+            let mut p = player.borrow_mut();
+            p.c_transform = CTransform {
+                position,
+                velocity: Vec2::new(0.0, 10.0),
+                rotation: 0.0,
+            };
+            p.c_shape = CShape {
+                shape: Shape::Rectangle(100, 100),
+                color: Color::WHITE,
+            };
+        }
+
+        player
+    }
 }
 
 impl Scene for MarioScene {
@@ -130,7 +166,7 @@ impl Scene for MarioScene {
 
         self.draw_axes(d);
 
-        self.shoot(dt);
+        //self.shoot(dt);
         self.entity_manager.update();
 
         if let Some(entities) = self.entity_manager.get_entities(None) {
