@@ -7,7 +7,7 @@ use raylib::{
 };
 
 use crate::{
-    component::{cshape::CShape, ctransform::CTransform},
+    component::{cbbox::CBBox, cshape::CShape, ctransform::CTransform},
     entity::{entity_manager::EntityManager, Entity},
     util::{
         constant::{WINDOW_HEIGHT, WINDOW_WIDTH},
@@ -32,6 +32,7 @@ impl MarioScene {
         let center = (WINDOW_WIDTH as i32 / 2, WINDOW_HEIGHT as i32 / 2);
 
         let player = MarioScene::spawn_player(&mut entity_manager);
+        MarioScene::spawn_ground(&mut entity_manager);
 
         MarioScene {
             entity_manager,
@@ -80,28 +81,56 @@ impl MarioScene {
                         d.draw_circle(position.x as i32, position.y as i32, r, e.c_shape.color)
                     }
                     Shape::Rectangle(w, h) => d.draw_rectangle(
-                        position.x as i32 - w / 2,
-                        position.y as i32 - h / 2,
-                        w,
-                        h,
+                        position.x as i32 - w as i32,
+                        position.y as i32 - h as i32,
+                        w as i32 * 2,
+                        h as i32 * 2,
                         e.c_shape.color,
                     ),
                 }
             }
         }
     }
-    fn check_out_of_bound(entities: &mut Vec<Rc<RefCell<Entity>>>) {
+    fn collision_detection(entities: &mut Vec<Rc<RefCell<Entity>>>, player: &Rc<RefCell<Entity>>) {
         for e in entities.iter_mut() {
-            let mut e = e.borrow_mut();
-            if !e.is_alive() {
+            if !e.borrow().is_alive() {
                 continue;
             }
-            if e.c_transform.position.x < 0.0
-                || e.c_transform.position.y < 0.0
-                || e.c_transform.position.x > WINDOW_WIDTH as f32
-                || e.c_transform.position.y > WINDOW_HEIGHT as f32
-            {
-                e.destroy();
+            //if e.c_transform.position.x < 0.0
+            //    || e.c_transform.position.y < 0.0
+            //    || e.c_transform.position.x > WINDOW_WIDTH as f32
+            //    || e.c_transform.position.y > WINDOW_HEIGHT as f32
+            //{
+            //    e.destroy();
+            //}
+            let (horizontal_colliions, vertical_collision) =
+                if let Shape::Rectangle(pw, ph) = player.borrow().c_bbox.shape {
+                    if let Shape::Rectangle(ew, eh) = e.borrow().c_bbox.shape {
+                        let player_position = player.borrow().c_transform.position;
+                        let player_top = player_position.y - ph;
+                        let player_bottom = player_position.y + ph;
+                        let player_left = player_position.x - pw;
+                        let player_right = player_position.x + pw;
+
+                        let e_position = e.borrow().c_transform.position;
+                        let e_top = e_position.y - eh;
+                        let e_bottom = e_position.y + eh;
+                        let e_left = e_position.x - ew;
+                        let e_right = e_position.x + ew;
+
+                        (
+                            player_top < e_bottom && e_top < player_bottom,
+                            player_left < e_right && e_left < player_right,
+                        )
+                    } else {
+                        (false, false)
+                    }
+                } else {
+                    (false, false)
+                };
+
+            if horizontal_colliions && vertical_collision {
+                player.borrow_mut().c_transform.velocity.y = 0.0;
             }
         }
     }
@@ -130,8 +159,8 @@ impl MarioScene {
                 rotation: 0.0,
             };
             e.c_shape = CShape {
-                //shape: Shape::Circle(5.0),
-                shape: Shape::Rectangle(25, 25),
+                shape: Shape::Circle(5.0),
+                //shape: Shape::Rectangle(25.0, 25.0),
                 color: Color::WHITE,
             };
             theta += angle;
@@ -139,23 +168,52 @@ impl MarioScene {
     }
 
     fn spawn_player(entity_manager: &mut EntityManager) -> Rc<RefCell<Entity>> {
-        let position = Vec2::new(WINDOW_WIDTH as f32 / 2.0, WINDOW_HEIGHT as f32 / 2.0);
+        let position = Vec2::new(WINDOW_WIDTH as f32 / 2.0, 0.0);
 
+        let player_size = 50.0;
         let player = entity_manager.add_entity("Player".to_string());
         {
             let mut p = player.borrow_mut();
             p.c_transform = CTransform {
                 position,
-                velocity: Vec2::new(0.0, 50.0),
+                velocity: Vec2::new(0.0, 300.0),
                 rotation: 0.0,
             };
             p.c_shape = CShape {
-                shape: Shape::Rectangle(100, 100),
+                shape: Shape::Rectangle(player_size, player_size),
                 color: Color::WHITE,
+            };
+            p.c_bbox = CBBox {
+                shape: Shape::Rectangle(player_size, player_size),
             };
         }
 
         player
+    }
+
+    fn spawn_ground(entity_manager: &mut EntityManager) {
+        let floor_size: f32 = 50.0;
+        let half_size = 25.0;
+        let brick_count = WINDOW_WIDTH / floor_size as u32;
+
+        for i in 0..brick_count {
+            let e = entity_manager.add_entity("Brick".to_string());
+            e.borrow_mut().c_transform = CTransform {
+                position: Vec2::new(
+                    i as f32 * floor_size + half_size,
+                    WINDOW_HEIGHT as f32 - half_size,
+                ),
+                velocity: Vec2::new(0.0, 0.0),
+                rotation: 0.0,
+            };
+            e.borrow_mut().c_shape = CShape {
+                shape: Shape::Rectangle(floor_size, floor_size),
+                color: Color::RED,
+            };
+            e.borrow_mut().c_bbox = CBBox {
+                shape: Shape::Rectangle(floor_size, floor_size),
+            };
+        }
     }
 }
 
@@ -166,12 +224,15 @@ impl Scene for MarioScene {
 
         self.draw_axes(d);
 
-        self.shoot(dt);
+        //self.shoot(dt);
         self.entity_manager.update();
+
+        if let Some(entities) = self.entity_manager.get_entities(Some("Brick".to_string())) {
+            MarioScene::collision_detection(entities, &self.player);
+        }
 
         if let Some(entities) = self.entity_manager.get_entities(None) {
             MarioScene::move_entities(entities, dt);
-            MarioScene::check_out_of_bound(entities);
             MarioScene::render(entities, d);
             d.draw_text(
                 format!("{}", entities.len()).as_str(),

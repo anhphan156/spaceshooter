@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use crate::component::{cshape::CShape, ctransform::CTransform};
+use crate::component::{cbbox::CBBox, cshape::CShape, ctransform::CTransform};
 
 pub mod entity_manager;
 
@@ -12,6 +12,7 @@ pub struct Entity {
     tag: String,
     pub c_transform: CTransform,
     pub c_shape: CShape,
+    pub c_bbox: CBBox,
 }
 
 #[allow(unused)]
@@ -23,6 +24,7 @@ impl Entity {
             tag: String::new(),
             c_transform: CTransform::new(),
             c_shape: CShape::default(),
+            c_bbox: CBBox::default(),
         }
     }
 

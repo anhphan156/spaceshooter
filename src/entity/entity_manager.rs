@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::component::{cshape::CShape, ctransform::CTransform};
+use crate::component::{cbbox::CBBox, cshape::CShape, ctransform::CTransform};
 
 use super::Entity;
 
@@ -62,6 +62,7 @@ impl EntityManager {
             tag,
             c_transform: CTransform::new(),
             c_shape: CShape::default(),
+            c_bbox: CBBox::default(),
         };
         let e = Rc::new(RefCell::new(e));
         self.pending.push(e);
