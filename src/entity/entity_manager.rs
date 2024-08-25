@@ -34,14 +34,14 @@ impl EntityManager {
         }
         self.pending.clear();
 
-        //for e in self.entities.iter() {
-        //    if !e.borrow().is_alive {
-        //        if let Some(tagged_e) = self.tagged_entities.get_mut(&e.tag) {
-        //            tagged_e.retain(|x| x.is_alive)
-        //        }
-        //    }
-        //}
-        //self.entities.retain(|x| x.is_alive);
+        for e in self.entities.iter() {
+            if !e.borrow().is_alive {
+                if let Some(tagged_e) = self.tagged_entities.get_mut(&e.borrow().tag) {
+                    tagged_e.retain(|x| x.borrow().is_alive)
+                }
+            }
+        }
+        self.entities.retain(|x| x.borrow().is_alive);
     }
 
     pub fn count(&self) -> u64 {

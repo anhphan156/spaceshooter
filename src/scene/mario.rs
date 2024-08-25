@@ -146,7 +146,7 @@ impl MarioScene {
             let mut p = player.borrow_mut();
             p.c_transform = CTransform {
                 position,
-                velocity: Vec2::new(0.0, 10.0),
+                velocity: Vec2::new(0.0, 50.0),
                 rotation: 0.0,
             };
             p.c_shape = CShape {
@@ -166,7 +166,7 @@ impl Scene for MarioScene {
 
         self.draw_axes(d);
 
-        //self.shoot(dt);
+        self.shoot(dt);
         self.entity_manager.update();
 
         if let Some(entities) = self.entity_manager.get_entities(None) {
