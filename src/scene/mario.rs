@@ -5,9 +5,12 @@ use raylib::{
 };
 
 use crate::{
-    component::ctransform::CTransform,
+    component::{cshape::CShape, ctransform::CTransform},
     entity::{entity_manager::EntityManager, Entity},
-    util::constant::{WINDOW_HEIGHT, WINDOW_WIDTH},
+    util::{
+        constant::{WINDOW_HEIGHT, WINDOW_WIDTH},
+        geometry::Shape,
+    },
 };
 
 use super::Scene;
@@ -52,15 +55,26 @@ impl MarioScene {
     fn move_entities(entities: &mut Vec<Entity>, dt: f32) {
         for e in entities.iter_mut() {
             if e.is_alive() {
-                e.transform.position += e.transform.velocity * dt;
+                e.c_transform.position += e.c_transform.velocity * dt;
             }
         }
     }
     fn render(entities: &Vec<Entity>, d: &mut RaylibDrawHandle) {
         for e in entities.iter() {
             if e.is_alive() {
-                let position = e.transform.position;
-                d.draw_circle(position.x as i32, position.y as i32, 5.0, Color::WHITE);
+                let position = e.c_transform.position;
+                match e.c_shape.shape {
+                    Shape::Circle(r) => {
+                        d.draw_circle(position.x as i32, position.y as i32, r, e.c_shape.color)
+                    }
+                    Shape::Rectangle(w, h) => d.draw_rectangle(
+                        position.x as i32,
+                        position.y as i32,
+                        w,
+                        h,
+                        e.c_shape.color,
+                    ),
+                }
             }
         }
     }
@@ -69,10 +83,10 @@ impl MarioScene {
             if !e.is_alive() {
                 continue;
             }
-            if e.transform.position.x < 0.0
-                || e.transform.position.y < 0.0
-                || e.transform.position.x > WINDOW_WIDTH as f32
-                || e.transform.position.y > WINDOW_HEIGHT as f32
+            if e.c_transform.position.x < 0.0
+                || e.c_transform.position.y < 0.0
+                || e.c_transform.position.x > WINDOW_WIDTH as f32
+                || e.c_transform.position.y > WINDOW_HEIGHT as f32
             {
                 e.destroy();
             }
@@ -94,10 +108,15 @@ impl MarioScene {
             let velocity = Vec2::new(f32::cos(theta + self.offset), f32::sin(theta + self.offset));
 
             let e = self.entity_manager.add_entity("ball".to_string());
-            e.transform = CTransform {
+            e.c_transform = CTransform {
                 position: velocity + center,
                 velocity: velocity * 200.0,
                 rotation: 0.0,
+            };
+            e.c_shape = CShape {
+                //shape: Shape::Circle(5.0),
+                shape: Shape::Rectangle(25, 25),
+                color: Color::WHITE,
             };
             theta += angle;
         }
@@ -111,9 +130,9 @@ impl Scene for MarioScene {
 
         self.draw_axes(d);
 
+        self.shoot(dt);
         self.entity_manager.update();
 
-        self.shoot(dt);
         if let Some(entities) = self.entity_manager.get_entities(None) {
             MarioScene::move_entities(entities, dt);
             MarioScene::check_out_of_bound(entities);

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::component::ctransform::CTransform;
+use crate::component::{cshape::CShape, ctransform::CTransform};
 
 use super::Entity;
 
@@ -60,7 +60,8 @@ impl EntityManager {
             is_alive: true,
             id: self.entity_count,
             tag,
-            transform: CTransform::new(),
+            c_transform: CTransform::new(),
+            c_shape: CShape::default(),
         };
         self.pending.push(e);
 

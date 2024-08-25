@@ -1,4 +1,4 @@
-use crate::component::ctransform::CTransform;
+use crate::component::{cshape::CShape, ctransform::CTransform};
 
 pub mod entity_manager;
 
@@ -8,7 +8,8 @@ pub struct Entity {
     is_alive: bool,
     id: u64,
     tag: String,
-    pub transform: CTransform,
+    pub c_transform: CTransform,
+    pub c_shape: CShape,
 }
 
 #[allow(unused)]
@@ -18,7 +19,8 @@ impl Entity {
             is_alive: true,
             id: 0,
             tag: String::new(),
-            transform: CTransform::new(),
+            c_transform: CTransform::new(),
+            c_shape: CShape::default(),
         }
     }
 
