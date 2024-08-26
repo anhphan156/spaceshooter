@@ -1,6 +1,7 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, rc::Rc};
 
 use crate::{
+    asset::AssetManager,
     scene::{mario::MarioScene, Scene},
     util::constant::{WINDOW_HEIGHT, WINDOW_TITLE, WINDOW_WIDTH},
 };
@@ -11,6 +12,7 @@ pub struct Game<'a> {
     thread: RaylibThread,
     scenes: HashMap<u8, Box<dyn Scene>>,
     current_scene: Option<&'a mut Box<dyn Scene>>,
+    asset_manager: Rc<AssetManager>,
 }
 
 impl<'a> Game<'a> {
@@ -22,7 +24,9 @@ impl<'a> Game<'a> {
 
         rl.set_target_fps(120);
 
-        let mario_scene = MarioScene::new();
+        let asset_manager = Rc::new(AssetManager::new(&mut rl, &thread));
+
+        let mario_scene = MarioScene::new(Rc::clone(&asset_manager));
         let mario_scene = Box::new(mario_scene);
 
         let mut scenes: HashMap<u8, Box<dyn Scene>> = HashMap::new();
@@ -33,6 +37,7 @@ impl<'a> Game<'a> {
             thread,
             scenes,
             current_scene: None,
+            asset_manager,
         }
     }
 
@@ -47,6 +52,7 @@ impl<'a> Game<'a> {
         while !self.rl.window_should_close() {
             let dt = self.rl.get_frame_time();
             let mut d = self.rl.begin_drawing(&self.thread);
+
             if let Some(scene) = &mut self.current_scene {
                 scene.update(&mut d, dt);
             } else {

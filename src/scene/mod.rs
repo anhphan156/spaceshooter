@@ -1,5 +1,7 @@
 use raylib::prelude::RaylibDrawHandle;
 
+use crate::asset::AssetManager;
+
 pub mod mario;
 
 pub trait Scene {

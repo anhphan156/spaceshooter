@@ -3,10 +3,12 @@ use std::{cell::RefCell, rc::Rc};
 use glam::Vec2;
 use raylib::{
     color::Color,
+    ffi::{Rectangle, Vector2},
     prelude::{RaylibDraw, RaylibDrawHandle},
 };
 
 use crate::{
+    asset::AssetManager,
     component::{cbbox::CBBox, cshape::CShape, ctransform::CTransform},
     entity::{entity_manager::EntityManager, Entity},
     util::{
@@ -20,6 +22,7 @@ use super::Scene;
 #[allow(dead_code)]
 pub struct MarioScene {
     pub entity_manager: EntityManager,
+    asset_manager: Rc<AssetManager>,
     player: Rc<RefCell<Entity>>,
     center: (i32, i32),
     offset: f32,
@@ -27,7 +30,7 @@ pub struct MarioScene {
 }
 
 impl MarioScene {
-    pub fn new() -> MarioScene {
+    pub fn new(asset_manager: Rc<AssetManager>) -> MarioScene {
         let mut entity_manager = EntityManager::new();
         let center = (WINDOW_WIDTH as i32 / 2, WINDOW_HEIGHT as i32 / 2);
 
@@ -36,6 +39,7 @@ impl MarioScene {
 
         MarioScene {
             entity_manager,
+            asset_manager,
             player,
             center,
             offset: 0.0,
@@ -71,7 +75,11 @@ impl MarioScene {
             }
         }
     }
-    fn render(entities: &Vec<Rc<RefCell<Entity>>>, d: &mut RaylibDrawHandle) {
+    fn render(
+        entities: &Vec<Rc<RefCell<Entity>>>,
+        asset_manager: &Rc<AssetManager>,
+        d: &mut RaylibDrawHandle,
+    ) {
         for e in entities.iter() {
             let e = e.borrow();
             if e.is_alive() {
@@ -80,13 +88,39 @@ impl MarioScene {
                     Shape::Circle(r) => {
                         d.draw_circle(position.x as i32, position.y as i32, r, e.c_shape.color)
                     }
-                    Shape::Rectangle(w, h) => d.draw_rectangle(
-                        position.x as i32 - w as i32,
-                        position.y as i32 - h as i32,
-                        w as i32 * 2,
-                        h as i32 * 2,
-                        e.c_shape.color,
-                    ),
+                    //Shape::Rectangle(w, h) => d.draw_rectangle(
+                    //    position.x as i32 - w as i32,
+                    //    position.y as i32 - h as i32,
+                    //    w as i32 * 2,
+                    //    h as i32 * 2,
+                    //    e.c_shape.color,
+                    //),
+                    Shape::Rectangle(w, h) => {
+                        if let Some(t) = asset_manager.textures.get(&"ground".to_string()) {
+                            let src_rec = Rectangle {
+                                x: 0.0,
+                                y: 0.0,
+                                width: 64.0,
+                                height: 64.0,
+                            };
+                            let dst_rec = Rectangle {
+                                x: position.x,
+                                y: position.y,
+                                width: w * 2.0,
+                                height: h * 2.0,
+                            };
+                            let origin = Vector2 { x: w, y: h };
+
+                            //d.draw_rectangle(
+                            //    position.x as i32 - w as i32,
+                            //    position.y as i32 - h as i32,
+                            //    w as i32 * 2,
+                            //    h as i32 * 2,
+                            //    e.c_shape.color,
+                            //);
+                            d.draw_texture_pro(t, src_rec, dst_rec, origin, 0.0, Color::WHITE);
+                        }
+                    }
                 }
             }
         }
@@ -180,7 +214,8 @@ impl MarioScene {
                 rotation: 0.0,
             };
             p.c_shape = CShape {
-                shape: Shape::Rectangle(player_size, player_size),
+                //shape: Shape::Rectangle(player_size, player_size),
+                shape: Shape::Circle(player_size),
                 color: Color::WHITE,
             };
             p.c_bbox = CBBox {
@@ -192,15 +227,15 @@ impl MarioScene {
     }
 
     fn spawn_ground(entity_manager: &mut EntityManager) {
-        let floor_size: f32 = 50.0;
-        let half_size = 25.0;
+        let floor_size: f32 = 64.0;
+        let half_size = 32.0;
         let brick_count = WINDOW_WIDTH / floor_size as u32;
 
         for i in 0..brick_count {
             let e = entity_manager.add_entity("Brick".to_string());
             e.borrow_mut().c_transform = CTransform {
                 position: Vec2::new(
-                    i as f32 * floor_size + half_size,
+                    i as f32 * floor_size * 2.0 + half_size,
                     WINDOW_HEIGHT as f32 - half_size,
                 ),
                 velocity: Vec2::new(0.0, 0.0),
@@ -233,7 +268,7 @@ impl Scene for MarioScene {
 
         if let Some(entities) = self.entity_manager.get_entities(None) {
             MarioScene::move_entities(entities, dt);
-            MarioScene::render(entities, d);
+            MarioScene::render(entities, &self.asset_manager, d);
             d.draw_text(
                 format!("{}", entities.len()).as_str(),
                 self.center.0,
