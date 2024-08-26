@@ -12,7 +12,6 @@ pub struct Game<'a> {
     thread: RaylibThread,
     scenes: HashMap<u8, Box<dyn Scene>>,
     current_scene: Option<&'a mut Box<dyn Scene>>,
-    asset_manager: Rc<AssetManager>,
 }
 
 impl<'a> Game<'a> {
@@ -37,7 +36,6 @@ impl<'a> Game<'a> {
             thread,
             scenes,
             current_scene: None,
-            asset_manager,
         }
     }
 
@@ -50,11 +48,8 @@ impl<'a> Game<'a> {
         self.current_scene = self.scenes.get_mut(&0);
 
         while !self.rl.window_should_close() {
-            let dt = self.rl.get_frame_time();
-            let mut d = self.rl.begin_drawing(&self.thread);
-
             if let Some(scene) = &mut self.current_scene {
-                scene.update(&mut d, dt);
+                scene.update(&mut self.rl, &mut self.thread);
             } else {
                 panic!("No scene selected");
             }

@@ -1,6 +1,6 @@
 use glam::Vec2;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct CTransform {
     pub position: Vec2,
     pub velocity: Vec2,

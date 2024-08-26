@@ -3,8 +3,9 @@ use std::{cell::RefCell, rc::Rc};
 use glam::Vec2;
 use raylib::{
     color::Color,
-    ffi::{Rectangle, Vector2},
+    ffi::{KeyboardKey, Rectangle, Vector2},
     prelude::{RaylibDraw, RaylibDrawHandle},
+    RaylibHandle, RaylibThread,
 };
 
 use crate::{
@@ -66,15 +67,29 @@ impl MarioScene {
 
     fn move_entities(entities: &mut Vec<Rc<RefCell<Entity>>>, dt: f32) {
         for e in entities.iter_mut() {
-            let vec;
-            {
-                vec = e.borrow().c_transform.velocity;
-            }
+            let vec = e.borrow().c_transform.velocity;
             if e.borrow().is_alive() {
                 e.borrow_mut().c_transform.position += vec * dt;
             }
         }
     }
+
+    fn player_movement(player: &Rc<RefCell<Entity>>) {
+        let player_input = player.borrow().c_input.clone();
+        let player_velocity: &mut Vec2 = &mut player.borrow_mut().c_transform.velocity;
+        player_velocity.x = if player_input.left { -200.0 } else { 0.0 };
+        //player_velocity.y = if player_input.up { -200.0 } else { 300.0 };
+        //player_velocity.y = if player_input.down { -200.0 } else { 300.0 };
+    }
+
+    fn input_receiving(rl: &mut RaylibHandle, player: &Rc<RefCell<Entity>>) {
+        let player_input = &mut player.borrow_mut().c_input;
+        player_input.left = rl.is_key_down(KeyboardKey::KEY_LEFT);
+        player_input.right = rl.is_key_down(KeyboardKey::KEY_RIGHT);
+        player_input.up = rl.is_key_down(KeyboardKey::KEY_UP);
+        player_input.down = rl.is_key_down(KeyboardKey::KEY_DOWN);
+    }
+
     fn render(
         entities: &Vec<Rc<RefCell<Entity>>>,
         asset_manager: &Rc<AssetManager>,
@@ -253,14 +268,19 @@ impl MarioScene {
 }
 
 impl Scene for MarioScene {
-    fn update(&mut self, d: &mut RaylibDrawHandle, dt: f32) {
+    fn update(&mut self, rl: &mut RaylibHandle, thread: &mut RaylibThread) {
+        self.entity_manager.update();
+        MarioScene::input_receiving(rl, &self.player);
+        MarioScene::player_movement(&self.player);
+
+        let dt = rl.get_frame_time();
+        let mut d = rl.begin_drawing(&thread);
+
         d.clear_background(Color::BLACK);
         d.draw_fps(12, 12);
-
-        self.draw_axes(d);
+        self.draw_axes(&mut d);
 
         //self.shoot(dt);
-        self.entity_manager.update();
 
         if let Some(entities) = self.entity_manager.get_entities(Some("Brick".to_string())) {
             MarioScene::collision_detection(entities, &self.player);
@@ -268,7 +288,7 @@ impl Scene for MarioScene {
 
         if let Some(entities) = self.entity_manager.get_entities(None) {
             MarioScene::move_entities(entities, dt);
-            MarioScene::render(entities, &self.asset_manager, d);
+            MarioScene::render(entities, &self.asset_manager, &mut d);
             d.draw_text(
                 format!("{}", entities.len()).as_str(),
                 self.center.0,
