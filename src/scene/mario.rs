@@ -95,7 +95,6 @@ impl MarioScene {
 
         if player_input.up && on_ground {
             player_velocity.y = -1000.0;
-            player.c_state.on_ground = false;
         } else {
             player_velocity.y += 10.0;
             player_velocity.y = f32::min(300.0, player_velocity.y);
@@ -201,6 +200,8 @@ impl MarioScene {
                         player_bbox.collision_axes = (false, false);
                         player_bbox.prev_collision_axes = (false, false);
                         player_bbox.overlapped_shape = (0.0, 0.0);
+
+                        player_borrowed.c_state.on_ground = false;
                     }
                 };
             };
@@ -215,10 +216,8 @@ impl MarioScene {
         if player_collision {
             let dir_x = f32::signum(player.borrow().c_transform.velocity.x);
             let dir_y = f32::signum(player.borrow().c_transform.velocity.y);
-            if prev_player_collision.1 {
-                player.borrow_mut().c_transform.position.x -= player_overlap.0 * dir_x;
-            }
             if prev_player_collision.0 {
+                // pushing vertically
                 player.borrow_mut().c_transform.position.y -= player_overlap.1 * dir_y;
 
                 if dir_y < 0.0 {
@@ -229,6 +228,9 @@ impl MarioScene {
                     // jump cooldown
                     player.borrow_mut().c_state.on_ground = true;
                 }
+            } else if prev_player_collision.1 {
+                // pushing horizontally
+                player.borrow_mut().c_transform.position.x -= player_overlap.0 * dir_x;
             }
         }
     }
