@@ -1,4 +1,6 @@
-use crate::component::{cbbox::CBBox, cinput::CInput, cshape::CShape, ctransform::CTransform};
+use crate::component::{
+    cbbox::CBBox, cinput::CInput, cshape::CShape, cstate::CState, ctransform::CTransform,
+};
 
 pub mod entity_manager;
 
@@ -12,6 +14,7 @@ pub struct Entity {
     pub c_shape: CShape,
     pub c_bbox: CBBox,
     pub c_input: CInput,
+    pub c_state: CState,
 }
 
 #[allow(unused)]
@@ -25,6 +28,7 @@ impl Entity {
             c_shape: CShape::default(),
             c_bbox: CBBox::default(),
             c_input: CInput::default(),
+            c_state: CState::default(),
         }
     }
 

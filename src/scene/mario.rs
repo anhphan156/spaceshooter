@@ -80,8 +80,10 @@ impl MarioScene {
     }
 
     fn player_movement(player: &Player) {
-        let player_input = player.borrow().c_input.clone();
-        let player_velocity: &mut Vec2 = &mut player.borrow_mut().c_transform.velocity;
+        let mut player = player.borrow_mut();
+        let player_input = player.c_input.clone();
+        let on_ground = player.c_state.on_ground;
+        let player_velocity: &mut Vec2 = &mut player.c_transform.velocity;
 
         if player_input.left {
             player_velocity.x = -200.0;
@@ -91,8 +93,9 @@ impl MarioScene {
             player_velocity.x = 0.0;
         }
 
-        if player_input.up {
+        if player_input.up && on_ground {
             player_velocity.y = -1000.0;
+            player.c_state.on_ground = false;
         } else {
             player_velocity.y += 10.0;
             player_velocity.y = f32::min(300.0, player_velocity.y);
@@ -217,10 +220,15 @@ impl MarioScene {
             }
             if prev_player_collision.0 {
                 player.borrow_mut().c_transform.position.y -= player_overlap.1 * dir_y;
-            }
 
-            if dir_y < 0.0 {
-                player.borrow_mut().c_transform.velocity.y *= -1.0;
+                if dir_y < 0.0 {
+                    // this ensures player falls down when they hit their head
+                    player.borrow_mut().c_transform.velocity.y *= -1.0;
+                }
+                if dir_y > 0.0 {
+                    // jump cooldown
+                    player.borrow_mut().c_state.on_ground = true;
+                }
             }
         }
     }
