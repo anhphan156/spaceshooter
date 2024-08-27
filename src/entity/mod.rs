@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use crate::component::{cbbox::CBBox, cinput::CInput, cshape::CShape, ctransform::CTransform};
 
 pub mod entity_manager;
@@ -36,5 +34,9 @@ impl Entity {
 
     pub fn destroy(&mut self) {
         self.is_alive = false
+    }
+
+    pub fn is_collided(&self) -> bool {
+        self.c_bbox.collision_axes.0 && self.c_bbox.collision_axes.1
     }
 }

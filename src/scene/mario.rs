@@ -20,11 +20,13 @@ use crate::{
 
 use super::Scene;
 
+type Player = Rc<RefCell<Entity>>;
+
 #[allow(dead_code)]
 pub struct MarioScene {
     pub entity_manager: EntityManager,
     asset_manager: Rc<AssetManager>,
-    player: Rc<RefCell<Entity>>,
+    player: Player,
     center: (i32, i32),
     offset: f32,
     cd: f32,
@@ -67,26 +69,35 @@ impl MarioScene {
 
     fn move_entities(entities: &mut Vec<Rc<RefCell<Entity>>>, dt: f32) {
         for e in entities.iter_mut() {
-            let vec = e.borrow().c_transform.velocity;
-            if e.borrow().is_alive() {
-                e.borrow_mut().c_transform.position += vec * dt;
+            if !e.borrow().is_alive() {
+                continue;
             }
+            let transform = &mut e.borrow_mut().c_transform;
+            let vec = transform.velocity;
+            transform.position += vec * dt;
         }
     }
 
-    fn player_movement(player: &Rc<RefCell<Entity>>) {
+    fn player_movement(player: &Player) {
         let player_input = player.borrow().c_input.clone();
         let player_velocity: &mut Vec2 = &mut player.borrow_mut().c_transform.velocity;
+
         player_velocity.x = if player_input.left { -200.0 } else { 0.0 };
-        //player_velocity.y = if player_input.up { -200.0 } else { 300.0 };
+
+        if player_input.up {
+            player_velocity.y = -1000.0;
+        } else {
+            player_velocity.y += 10.0;
+            player_velocity.y = f32::min(300.0, player_velocity.y);
+        };
         //player_velocity.y = if player_input.down { -200.0 } else { 300.0 };
     }
 
-    fn input_receiving(rl: &mut RaylibHandle, player: &Rc<RefCell<Entity>>) {
+    fn input_receiving(rl: &mut RaylibHandle, player: &Player) {
         let player_input = &mut player.borrow_mut().c_input;
         player_input.left = rl.is_key_down(KeyboardKey::KEY_LEFT);
         player_input.right = rl.is_key_down(KeyboardKey::KEY_RIGHT);
-        player_input.up = rl.is_key_down(KeyboardKey::KEY_UP);
+        player_input.up = rl.is_key_pressed(KeyboardKey::KEY_UP);
         player_input.down = rl.is_key_down(KeyboardKey::KEY_DOWN);
     }
 
@@ -140,47 +151,60 @@ impl MarioScene {
             }
         }
     }
-    fn collision_detection(entities: &mut Vec<Rc<RefCell<Entity>>>, player: &Rc<RefCell<Entity>>) {
+    fn collision_detection(entities: &mut Vec<Rc<RefCell<Entity>>>, player: &Player) {
+        // Check collision of player against everything
         for e in entities.iter_mut() {
             if !e.borrow().is_alive() {
                 continue;
             }
-            //if e.c_transform.position.x < 0.0
-            //    || e.c_transform.position.y < 0.0
-            //    || e.c_transform.position.x > WINDOW_WIDTH as f32
-            //    || e.c_transform.position.y > WINDOW_HEIGHT as f32
-            //{
-            //    e.destroy();
-            //}
-            let (horizontal_colliions, vertical_collision) =
-                if let Shape::Rectangle(pw, ph) = player.borrow().c_bbox.shape {
-                    if let Shape::Rectangle(ew, eh) = e.borrow().c_bbox.shape {
-                        let player_position = player.borrow().c_transform.position;
-                        let player_top = player_position.y - ph;
-                        let player_bottom = player_position.y + ph;
-                        let player_left = player_position.x - pw;
-                        let player_right = player_position.x + pw;
 
-                        let e_position = e.borrow().c_transform.position;
-                        let e_top = e_position.y - eh;
-                        let e_bottom = e_position.y + eh;
-                        let e_left = e_position.x - ew;
-                        let e_right = e_position.x + ew;
+            let mut player_borrowed = player.borrow_mut();
+            let player_position = player_borrowed.c_transform.position;
+            let player_bbox = &mut player_borrowed.c_bbox;
+            if let Shape::Rectangle(pw, ph) = player_bbox.shape {
+                if let Shape::Rectangle(ew, eh) = e.borrow().c_bbox.shape {
+                    let player_top = player_position.y - ph;
+                    let player_bottom = player_position.y + ph;
+                    let player_left = player_position.x - pw;
+                    let player_right = player_position.x + pw;
 
-                        (
-                            player_top < e_bottom && e_top < player_bottom,
-                            player_left < e_right && e_left < player_right,
-                        )
-                    } else {
-                        (false, false)
+                    let e_position = e.borrow().c_transform.position;
+                    let e_top = e_position.y - eh;
+                    let e_bottom = e_position.y + eh;
+                    let e_left = e_position.x - ew;
+                    let e_right = e_position.x + ew;
+
+                    let h_collision = player_top < e_bottom && e_top < player_bottom;
+                    let v_collision = player_left < e_right && e_left < player_right;
+                    player_bbox.collision_axes = (h_collision, v_collision);
+                    if h_collision && v_collision {
+                        let dx =
+                            if f32::abs(player_left - e_right) > f32::abs(e_left - player_right) {
+                                f32::abs(e_left - player_right)
+                            } else {
+                                f32::abs(player_left - e_right)
+                            };
+
+                        let dy =
+                            if f32::abs(player_top - e_bottom) > f32::abs(e_top - player_bottom) {
+                                f32::abs(e_top - player_bottom)
+                            } else {
+                                f32::abs(player_top - e_bottom)
+                            };
+                        player_bbox.overlapped_shape = (dx, dy);
+                        break;
                     }
-                } else {
-                    (false, false)
                 };
+            };
+        }
+    }
 
-            if horizontal_colliions && vertical_collision {
-                player.borrow_mut().c_transform.velocity.y = 0.0;
-            }
+    fn collision_resolution(player: &Player) {
+        let player_collision = player.borrow().is_collided();
+        let player_overlap = player.borrow().c_bbox.overlapped_shape;
+
+        if player_collision {
+            player.borrow_mut().c_transform.position.y -= player_overlap.1;
         }
     }
 
@@ -205,7 +229,7 @@ impl MarioScene {
             e.c_transform = CTransform {
                 position: velocity + center,
                 velocity: velocity * 200.0,
-                rotation: 0.0,
+                ..Default::default()
             };
             e.c_shape = CShape {
                 shape: Shape::Circle(5.0),
@@ -219,22 +243,23 @@ impl MarioScene {
     fn spawn_player(entity_manager: &mut EntityManager) -> Rc<RefCell<Entity>> {
         let position = Vec2::new(WINDOW_WIDTH as f32 / 2.0, 0.0);
 
-        let player_size = 50.0;
+        let player_size = 30.0;
         let player = entity_manager.add_entity("Player".to_string());
         {
             let mut p = player.borrow_mut();
             p.c_transform = CTransform {
                 position,
                 velocity: Vec2::new(0.0, 300.0),
-                rotation: 0.0,
+                ..Default::default()
             };
             p.c_shape = CShape {
-                //shape: Shape::Rectangle(player_size, player_size),
-                shape: Shape::Circle(player_size),
+                shape: Shape::Rectangle(player_size, player_size),
+                //shape: Shape::Circle(player_size),
                 color: Color::WHITE,
             };
             p.c_bbox = CBBox {
                 shape: Shape::Rectangle(player_size, player_size),
+                ..Default::default()
             };
         }
 
@@ -242,8 +267,8 @@ impl MarioScene {
     }
 
     fn spawn_ground(entity_manager: &mut EntityManager) {
-        let floor_size: f32 = 64.0;
-        let half_size = 32.0;
+        let floor_size: f32 = 50.0;
+        let half_size = 25.0;
         let brick_count = WINDOW_WIDTH / floor_size as u32;
 
         for i in 0..brick_count {
@@ -254,7 +279,7 @@ impl MarioScene {
                     WINDOW_HEIGHT as f32 - half_size,
                 ),
                 velocity: Vec2::new(0.0, 0.0),
-                rotation: 0.0,
+                ..Default::default()
             };
             e.borrow_mut().c_shape = CShape {
                 shape: Shape::Rectangle(floor_size, floor_size),
@@ -262,8 +287,27 @@ impl MarioScene {
             };
             e.borrow_mut().c_bbox = CBBox {
                 shape: Shape::Rectangle(floor_size, floor_size),
+                ..Default::default()
             };
         }
+
+        let e = entity_manager.add_entity("Brick".to_string());
+        e.borrow_mut().c_transform = CTransform {
+            position: Vec2::new(
+                WINDOW_WIDTH as f32 / 2.0 + half_size - 200.0,
+                WINDOW_HEIGHT as f32 / 2.0 - half_size,
+            ),
+            velocity: Vec2::new(0.0, 0.0),
+            ..Default::default()
+        };
+        e.borrow_mut().c_shape = CShape {
+            shape: Shape::Rectangle(floor_size, floor_size),
+            color: Color::RED,
+        };
+        e.borrow_mut().c_bbox = CBBox {
+            shape: Shape::Rectangle(floor_size, floor_size),
+            ..Default::default()
+        };
     }
 }
 
@@ -285,6 +329,7 @@ impl Scene for MarioScene {
         if let Some(entities) = self.entity_manager.get_entities(Some("Brick".to_string())) {
             MarioScene::collision_detection(entities, &self.player);
         }
+        MarioScene::collision_resolution(&self.player);
 
         if let Some(entities) = self.entity_manager.get_entities(None) {
             MarioScene::move_entities(entities, dt);
