@@ -12,6 +12,7 @@ use crate::{
     asset::AssetManager,
     component::{cbbox::CBBox, cshape::CShape, ctransform::CTransform},
     entity::{entity_manager::EntityManager, Entity},
+    physics,
     util::{
         constant::{WINDOW_HEIGHT, WINDOW_WIDTH},
         geometry::Shape,
@@ -82,7 +83,13 @@ impl MarioScene {
         let player_input = player.borrow().c_input.clone();
         let player_velocity: &mut Vec2 = &mut player.borrow_mut().c_transform.velocity;
 
-        player_velocity.x = if player_input.left { -200.0 } else { 0.0 };
+        if player_input.left {
+            player_velocity.x = -200.0;
+        } else if player_input.right {
+            player_velocity.x = 200.0;
+        } else {
+            player_velocity.x = 0.0;
+        }
 
         if player_input.up {
             player_velocity.y = -1000.0;
@@ -159,40 +166,29 @@ impl MarioScene {
             }
 
             let mut player_borrowed = player.borrow_mut();
-            let player_position = player_borrowed.c_transform.position;
-            let player_bbox = &mut player_borrowed.c_bbox;
-            if let Shape::Rectangle(pw, ph) = player_bbox.shape {
+            let player_bbox_shape = player_borrowed.c_bbox.shape.clone();
+
+            if let Shape::Rectangle(pw, ph) = player_bbox_shape {
                 if let Shape::Rectangle(ew, eh) = e.borrow().c_bbox.shape {
-                    let player_top = player_position.y - ph;
-                    let player_bottom = player_position.y + ph;
-                    let player_left = player_position.x - pw;
-                    let player_right = player_position.x + pw;
-
+                    let player_position = player_borrowed.c_transform.position;
                     let e_position = e.borrow().c_transform.position;
-                    let e_top = e_position.y - eh;
-                    let e_bottom = e_position.y + eh;
-                    let e_left = e_position.x - ew;
-                    let e_right = e_position.x + ew;
 
-                    let h_collision = player_top < e_bottom && e_top < player_bottom;
-                    let v_collision = player_left < e_right && e_left < player_right;
-                    player_bbox.collision_axes = (h_collision, v_collision);
-                    if h_collision && v_collision {
-                        let dx =
-                            if f32::abs(player_left - e_right) > f32::abs(e_left - player_right) {
-                                f32::abs(e_left - player_right)
-                            } else {
-                                f32::abs(player_left - e_right)
-                            };
+                    let result = physics::aabb_collision_detection(
+                        player_position,
+                        e_position,
+                        Vec2::new(pw, ph),
+                        Vec2::new(ew, eh),
+                    );
 
-                        let dy =
-                            if f32::abs(player_top - e_bottom) > f32::abs(e_top - player_bottom) {
-                                f32::abs(e_top - player_bottom)
-                            } else {
-                                f32::abs(player_top - e_bottom)
-                            };
-                        player_bbox.overlapped_shape = (dx, dy);
+                    let player_bbox = &mut player_borrowed.c_bbox;
+                    if result.is_collided() {
+                        player_bbox.collision_axes = result.collision_axes;
+                        player_bbox.overlapped_shape = result.overlapped_shape;
+
                         break;
+                    } else {
+                        player_bbox.collision_axes = (false, false);
+                        player_bbox.overlapped_shape = (0.0, 0.0);
                     }
                 };
             };
