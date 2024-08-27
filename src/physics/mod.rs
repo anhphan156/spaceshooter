@@ -33,7 +33,7 @@ pub fn aabb_collision_detection(
     let dx = if f32::abs(a_left - b_right) > f32::abs(b_left - a_right) {
         f32::abs(b_left - a_right)
     } else {
-        f32::abs(b_left - b_right)
+        f32::abs(a_left - b_right)
     };
 
     let dy = if f32::abs(a_top - b_bottom) > f32::abs(b_top - a_bottom) {

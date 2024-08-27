@@ -74,8 +74,8 @@ impl MarioScene {
                 continue;
             }
             let transform = &mut e.borrow_mut().c_transform;
-            let vec = transform.velocity;
-            transform.position += vec * dt;
+            transform.prev_position = transform.position.clone();
+            transform.position += transform.velocity * dt;
         }
     }
 
@@ -97,7 +97,6 @@ impl MarioScene {
             player_velocity.y += 10.0;
             player_velocity.y = f32::min(300.0, player_velocity.y);
         };
-        //player_velocity.y = if player_input.down { -200.0 } else { 300.0 };
     }
 
     fn input_receiving(rl: &mut RaylibHandle, player: &Player) {
@@ -171,6 +170,7 @@ impl MarioScene {
             if let Shape::Rectangle(pw, ph) = player_bbox_shape {
                 if let Shape::Rectangle(ew, eh) = e.borrow().c_bbox.shape {
                     let player_position = player_borrowed.c_transform.position;
+                    let prev_player_position = player_borrowed.c_transform.prev_position;
                     let e_position = e.borrow().c_transform.position;
 
                     let result = physics::aabb_collision_detection(
@@ -185,9 +185,18 @@ impl MarioScene {
                         player_bbox.collision_axes = result.collision_axes;
                         player_bbox.overlapped_shape = result.overlapped_shape;
 
+                        let prev_result = physics::aabb_collision_detection(
+                            prev_player_position,
+                            e_position,
+                            Vec2::new(pw, ph),
+                            Vec2::new(ew, eh),
+                        );
+                        player_bbox.prev_collision_axes = prev_result.collision_axes;
+
                         break;
                     } else {
                         player_bbox.collision_axes = (false, false);
+                        player_bbox.prev_collision_axes = (false, false);
                         player_bbox.overlapped_shape = (0.0, 0.0);
                     }
                 };
@@ -197,10 +206,15 @@ impl MarioScene {
 
     fn collision_resolution(player: &Player) {
         let player_collision = player.borrow().is_collided();
+        let prev_player_collision = player.borrow().c_bbox.prev_collision_axes;
         let player_overlap = player.borrow().c_bbox.overlapped_shape;
 
         if player_collision {
-            player.borrow_mut().c_transform.position.y -= player_overlap.1;
+            if prev_player_collision.1 {
+                player.borrow_mut().c_transform.position.y -= player_overlap.1 + 2.0;
+            } else if prev_player_collision.0 {
+                player.borrow_mut().c_transform.position.x -= player_overlap.0;
+            }
         }
     }
 
@@ -319,8 +333,6 @@ impl Scene for MarioScene {
         d.clear_background(Color::BLACK);
         d.draw_fps(12, 12);
         self.draw_axes(&mut d);
-
-        //self.shoot(dt);
 
         if let Some(entities) = self.entity_manager.get_entities(Some("Brick".to_string())) {
             MarioScene::collision_detection(entities, &self.player);
