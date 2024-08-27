@@ -210,10 +210,17 @@ impl MarioScene {
         let player_overlap = player.borrow().c_bbox.overlapped_shape;
 
         if player_collision {
+            let dir_x = f32::signum(player.borrow().c_transform.velocity.x);
+            let dir_y = f32::signum(player.borrow().c_transform.velocity.y);
             if prev_player_collision.1 {
-                player.borrow_mut().c_transform.position.y -= player_overlap.1 + 2.0;
-            } else if prev_player_collision.0 {
-                player.borrow_mut().c_transform.position.x -= player_overlap.0;
+                player.borrow_mut().c_transform.position.x -= player_overlap.0 * dir_x;
+            }
+            if prev_player_collision.0 {
+                player.borrow_mut().c_transform.position.y -= player_overlap.1 * dir_y;
+            }
+
+            if dir_y < 0.0 {
+                player.borrow_mut().c_transform.velocity.y *= -1.0;
             }
         }
     }
@@ -333,6 +340,9 @@ impl Scene for MarioScene {
         d.clear_background(Color::BLACK);
         d.draw_fps(12, 12);
         self.draw_axes(&mut d);
+        if let Some(entities) = self.entity_manager.get_entities(None) {
+            MarioScene::move_entities(entities, dt);
+        }
 
         if let Some(entities) = self.entity_manager.get_entities(Some("Brick".to_string())) {
             MarioScene::collision_detection(entities, &self.player);
@@ -340,7 +350,6 @@ impl Scene for MarioScene {
         MarioScene::collision_resolution(&self.player);
 
         if let Some(entities) = self.entity_manager.get_entities(None) {
-            MarioScene::move_entities(entities, dt);
             MarioScene::render(entities, &self.asset_manager, &mut d);
             d.draw_text(
                 format!("{}", entities.len()).as_str(),
