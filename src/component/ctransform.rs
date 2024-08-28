@@ -9,18 +9,6 @@ pub struct CTransform {
     pub prev_position: Vec2,
 }
 
-impl CTransform {
-    pub fn new() -> CTransform {
-        CTransform {
-            position: Vec2::new(0.0, 0.0),
-            velocity: Vec2::new(0.0, 0.0),
-            acceleration: Vec2::new(0.0, 0.0),
-            rotation: 0.0_f32,
-            prev_position: Vec2::new(0.0, 0.0),
-        }
-    }
-}
-
 impl Default for CTransform {
     fn default() -> Self {
         CTransform {

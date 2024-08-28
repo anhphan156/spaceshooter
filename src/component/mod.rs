@@ -1,3 +1,4 @@
+pub mod canimation;
 pub mod cbbox;
 pub mod cinput;
 pub mod cname;

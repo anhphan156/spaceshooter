@@ -9,8 +9,9 @@ use raylib::{
 };
 
 use crate::{
+    animation::Animation,
     asset::AssetManager,
-    component::{cbbox::CBBox, cshape::CShape, ctransform::CTransform},
+    component::{canimation::CAnimation, cbbox::CBBox, cshape::CShape, ctransform::CTransform},
     entity::{entity_manager::EntityManager, Entity},
     physics,
     util::{
@@ -84,14 +85,17 @@ impl MarioScene {
         let player_input = player.c_input.clone();
         let on_ground = player.c_state.on_ground;
         let mut forward = player.c_state.forward;
+        let mut animation_enabled = false;
         let player_velocity: &mut Vec2 = &mut player.c_transform.velocity;
 
         if player_input.left {
             player_velocity.x = -200.0;
             forward = false;
+            animation_enabled = true;
         } else if player_input.right {
             player_velocity.x = 200.0;
             forward = true;
+            animation_enabled = true;
         } else {
             player_velocity.x = 0.0;
         }
@@ -104,6 +108,7 @@ impl MarioScene {
         };
 
         player.c_state.forward = forward;
+        player.c_animation.enabled = animation_enabled;
     }
 
     fn input_receiving(rl: &mut RaylibHandle, player: &Player) {
@@ -120,10 +125,16 @@ impl MarioScene {
         d: &mut RaylibDrawHandle,
     ) {
         for e in entities.iter() {
+            // animation
+            if e.borrow().c_animation.enabled {
+                e.borrow_mut().c_animation.animation.update();
+            }
+
             let e = e.borrow();
             if !e.is_alive() {
                 continue;
             }
+
             let position = e.c_transform.position;
             let forward = e.c_state.forward;
             match e.c_shape.shape {
@@ -139,8 +150,9 @@ impl MarioScene {
                 ),
                 Shape::RectText(src_w, src_h, dst_w, dst_h, texture_tag) => {
                     if let Some(t) = asset_manager.textures.get(&texture_tag.to_string()) {
+                        let src_x = e.c_animation.animation.anim_frame as f32;
                         let src_rec = Rectangle {
-                            x: 0.0,
+                            x: src_x * src_w,
                             y: 0.0,
                             width: src_w * if forward { 1.0 } else { -1.0 },
                             height: src_h,
@@ -287,6 +299,10 @@ impl MarioScene {
                 shape: Shape::Rectangle(player_size - 15.0, player_size - 15.0),
                 ..Default::default()
             };
+            p.c_animation = CAnimation {
+                enabled: true,
+                animation: Animation::new(18, 3),
+            }
         }
 
         player
