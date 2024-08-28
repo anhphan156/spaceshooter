@@ -83,12 +83,15 @@ impl MarioScene {
         let mut player = player.borrow_mut();
         let player_input = player.c_input.clone();
         let on_ground = player.c_state.on_ground;
+        let mut forward = player.c_state.forward;
         let player_velocity: &mut Vec2 = &mut player.c_transform.velocity;
 
         if player_input.left {
             player_velocity.x = -200.0;
+            forward = false;
         } else if player_input.right {
             player_velocity.x = 200.0;
+            forward = true;
         } else {
             player_velocity.x = 0.0;
         }
@@ -99,6 +102,8 @@ impl MarioScene {
             player_velocity.y += 10.0;
             player_velocity.y = f32::min(300.0, player_velocity.y);
         };
+
+        player.c_state.forward = forward;
     }
 
     fn input_receiving(rl: &mut RaylibHandle, player: &Player) {
@@ -116,44 +121,39 @@ impl MarioScene {
     ) {
         for e in entities.iter() {
             let e = e.borrow();
-            if e.is_alive() {
-                let position = e.c_transform.position;
-                match e.c_shape.shape {
-                    Shape::Circle(r) => {
-                        d.draw_circle(position.x as i32, position.y as i32, r, e.c_shape.color)
-                    }
-                    //Shape::Rectangle(w, h) => d.draw_rectangle(
-                    //    position.x as i32 - w as i32,
-                    //    position.y as i32 - h as i32,
-                    //    w as i32 * 2,
-                    //    h as i32 * 2,
-                    //    e.c_shape.color,
-                    //),
-                    Shape::Rectangle(w, h) => {
-                        if let Some(t) = asset_manager.textures.get(&"ground".to_string()) {
-                            let src_rec = Rectangle {
-                                x: 0.0,
-                                y: 0.0,
-                                width: 64.0,
-                                height: 64.0,
-                            };
-                            let dst_rec = Rectangle {
-                                x: position.x,
-                                y: position.y,
-                                width: w * 2.0,
-                                height: h * 2.0,
-                            };
-                            let origin = Vector2 { x: w, y: h };
+            if !e.is_alive() {
+                continue;
+            }
+            let position = e.c_transform.position;
+            let forward = e.c_state.forward;
+            match e.c_shape.shape {
+                Shape::Circle(r) => {
+                    d.draw_circle(position.x as i32, position.y as i32, r, e.c_shape.color)
+                }
+                Shape::Rectangle(w, h) => d.draw_rectangle(
+                    position.x as i32 - w as i32,
+                    position.y as i32 - h as i32,
+                    w as i32 * 2,
+                    h as i32 * 2,
+                    e.c_shape.color,
+                ),
+                Shape::RectText(src_w, src_h, dst_w, dst_h, texture_tag) => {
+                    if let Some(t) = asset_manager.textures.get(&texture_tag.to_string()) {
+                        let src_rec = Rectangle {
+                            x: 0.0,
+                            y: 0.0,
+                            width: src_w * if forward { 1.0 } else { -1.0 },
+                            height: src_h,
+                        };
+                        let dst_rec = Rectangle {
+                            x: position.x,
+                            y: position.y,
+                            width: dst_w * 2.0,
+                            height: dst_h * 2.0,
+                        };
+                        let origin = Vector2 { x: dst_w, y: dst_h };
 
-                            //d.draw_rectangle(
-                            //    position.x as i32 - w as i32,
-                            //    position.y as i32 - h as i32,
-                            //    w as i32 * 2,
-                            //    h as i32 * 2,
-                            //    e.c_shape.color,
-                            //);
-                            d.draw_texture_pro(t, src_rec, dst_rec, origin, 0.0, Color::WHITE);
-                        }
+                        d.draw_texture_pro(t, src_rec, dst_rec, origin, 0.0, Color::WHITE);
                     }
                 }
             }
@@ -270,7 +270,7 @@ impl MarioScene {
     fn spawn_player(entity_manager: &mut EntityManager) -> Rc<RefCell<Entity>> {
         let position = Vec2::new(WINDOW_WIDTH as f32 / 2.0, 0.0);
 
-        let player_size = 30.0;
+        let player_size = 60.0;
         let player = entity_manager.add_entity("Player".to_string());
         {
             let mut p = player.borrow_mut();
@@ -280,12 +280,11 @@ impl MarioScene {
                 ..Default::default()
             };
             p.c_shape = CShape {
-                shape: Shape::Rectangle(player_size, player_size),
-                //shape: Shape::Circle(player_size),
+                shape: Shape::RectText(246.0, 246.0, player_size, player_size, "mega_run"),
                 color: Color::WHITE,
             };
             p.c_bbox = CBBox {
-                shape: Shape::Rectangle(player_size, player_size),
+                shape: Shape::Rectangle(player_size - 15.0, player_size - 15.0),
                 ..Default::default()
             };
         }
@@ -294,6 +293,7 @@ impl MarioScene {
     }
 
     fn spawn_ground(entity_manager: &mut EntityManager) {
+        let floor_tex_size = 64.0;
         let floor_size: f32 = 50.0;
         let half_size = 25.0;
         let brick_count = WINDOW_WIDTH / floor_size as u32;
@@ -309,7 +309,13 @@ impl MarioScene {
                 ..Default::default()
             };
             e.borrow_mut().c_shape = CShape {
-                shape: Shape::Rectangle(floor_size, floor_size),
+                shape: Shape::RectText(
+                    floor_tex_size,
+                    floor_tex_size,
+                    floor_size,
+                    floor_size,
+                    "ground",
+                ),
                 color: Color::RED,
             };
             e.borrow_mut().c_bbox = CBBox {
