@@ -11,7 +11,7 @@ impl AssetManager {
     pub fn new(rl: &mut RaylibHandle, thread: &RaylibThread) -> AssetManager {
         let mut textures: HashMap<String, Texture2D> = HashMap::new();
 
-        let texture_names = ["ground", "mega_run"];
+        let texture_names = ["ground", "mega_run", "mega_stand", "mega_jump"];
         for name in texture_names {
             let ground = rl.load_texture(
                 thread,

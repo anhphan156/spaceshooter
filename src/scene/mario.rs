@@ -84,18 +84,12 @@ impl MarioScene {
         let mut player = player.borrow_mut();
         let player_input = player.c_input.clone();
         let on_ground = player.c_state.on_ground;
-        let mut forward = player.c_state.forward;
-        let mut animation_enabled = false;
         let player_velocity: &mut Vec2 = &mut player.c_transform.velocity;
 
         if player_input.left {
             player_velocity.x = -200.0;
-            forward = false;
-            animation_enabled = true;
         } else if player_input.right {
             player_velocity.x = 200.0;
-            forward = true;
-            animation_enabled = true;
         } else {
             player_velocity.x = 0.0;
         }
@@ -106,9 +100,43 @@ impl MarioScene {
             player_velocity.y += 10.0;
             player_velocity.y = f32::min(300.0, player_velocity.y);
         };
+    }
+
+    fn player_animation(player: &Player) {
+        let mut player = player.borrow_mut();
+        let mut forward = player.c_state.forward;
+        let on_ground = player.c_state.on_ground;
+        let mut animation_enabled = false;
+        let mut animation_name = "mega_stand";
+
+        if player.c_input.left {
+            forward = false;
+            animation_enabled = true;
+            animation_name = "mega_run";
+        }
+        if player.c_input.right {
+            forward = true;
+            animation_enabled = true;
+            animation_name = "mega_run";
+        }
+        if !on_ground {
+            animation_enabled = false;
+            animation_name = "mega_jump";
+        }
 
         player.c_state.forward = forward;
         player.c_animation.enabled = animation_enabled;
+        match player.c_shape.shape {
+            Shape::RectText(_, _, c, d, _) => {
+                let (a, b) = if animation_name.eq("mega_stand") {
+                    (190.0, 208.0)
+                } else {
+                    (246.0, 246.0)
+                };
+                player.c_shape.shape = Shape::RectText(a, b, c, d, animation_name)
+            }
+            _ => {}
+        };
     }
 
     fn input_receiving(rl: &mut RaylibHandle, player: &Player) {
@@ -126,7 +154,8 @@ impl MarioScene {
     ) {
         for e in entities.iter() {
             // animation
-            if e.borrow().c_animation.enabled {
+            let is_animation_enabled = e.borrow().c_animation.enabled;
+            if is_animation_enabled {
                 e.borrow_mut().c_animation.animation.update();
             }
 
@@ -142,15 +171,19 @@ impl MarioScene {
                     d.draw_circle(position.x as i32, position.y as i32, r, e.c_shape.color)
                 }
                 Shape::Rectangle(w, h) => d.draw_rectangle(
-                    position.x as i32 - w as i32,
-                    position.y as i32 - h as i32,
-                    w as i32 * 2,
-                    h as i32 * 2,
+                    position.x as i32 - w as i32 / 2,
+                    position.y as i32 - h as i32 / 2,
+                    w as i32,
+                    h as i32,
                     e.c_shape.color,
                 ),
                 Shape::RectText(src_w, src_h, dst_w, dst_h, texture_tag) => {
                     if let Some(t) = asset_manager.textures.get(&texture_tag.to_string()) {
-                        let src_x = e.c_animation.animation.anim_frame as f32;
+                        let src_x = if is_animation_enabled {
+                            e.c_animation.animation.anim_frame as f32
+                        } else {
+                            0.0
+                        };
                         let src_rec = Rectangle {
                             x: src_x * src_w,
                             y: 0.0,
@@ -160,10 +193,13 @@ impl MarioScene {
                         let dst_rec = Rectangle {
                             x: position.x,
                             y: position.y,
-                            width: dst_w * 2.0,
-                            height: dst_h * 2.0,
+                            width: dst_w,
+                            height: dst_h,
                         };
-                        let origin = Vector2 { x: dst_w, y: dst_h };
+                        let origin = Vector2 {
+                            x: dst_w / 2.0,
+                            y: dst_h / 2.0,
+                        };
 
                         d.draw_texture_pro(t, src_rec, dst_rec, origin, 0.0, Color::WHITE);
                     }
@@ -282,7 +318,7 @@ impl MarioScene {
     fn spawn_player(entity_manager: &mut EntityManager) -> Rc<RefCell<Entity>> {
         let position = Vec2::new(WINDOW_WIDTH as f32 / 2.0, 0.0);
 
-        let player_size = 60.0;
+        let player_size = 120.0;
         let player = entity_manager.add_entity("Player".to_string());
         {
             let mut p = player.borrow_mut();
@@ -296,7 +332,7 @@ impl MarioScene {
                 color: Color::WHITE,
             };
             p.c_bbox = CBBox {
-                shape: Shape::Rectangle(player_size - 15.0, player_size - 15.0),
+                shape: Shape::Rectangle(player_size - 25.0, player_size - 25.0),
                 ..Default::default()
             };
             p.c_animation = CAnimation {
@@ -310,15 +346,15 @@ impl MarioScene {
 
     fn spawn_ground(entity_manager: &mut EntityManager) {
         let floor_tex_size = 64.0;
-        let floor_size: f32 = 50.0;
-        let half_size = 25.0;
+        let floor_size: f32 = 100.0;
+        let half_size = floor_size / 2.0;
         let brick_count = WINDOW_WIDTH / floor_size as u32;
 
         for i in 0..brick_count {
             let e = entity_manager.add_entity("Brick".to_string());
             e.borrow_mut().c_transform = CTransform {
                 position: Vec2::new(
-                    i as f32 * floor_size * 2.0 + half_size,
+                    i as f32 * floor_size + half_size,
                     WINDOW_HEIGHT as f32 - half_size,
                 ),
                 velocity: Vec2::new(0.0, 0.0),
@@ -365,6 +401,7 @@ impl Scene for MarioScene {
         self.entity_manager.update();
         MarioScene::input_receiving(rl, &self.player);
         MarioScene::player_movement(&self.player);
+        MarioScene::player_animation(&self.player);
 
         let dt = rl.get_frame_time();
         let mut d = rl.begin_drawing(&thread);

@@ -20,8 +20,8 @@ pub fn aabb_collision_detection(
     let dx = f32::abs(a_pos.x - b_pos.x);
     let dy = f32::abs(a_pos.y - b_pos.y);
 
-    let ox = a_shape.x + b_shape.x - dx;
-    let oy = a_shape.y + b_shape.y - dy;
+    let ox = a_shape.x / 2.0 + b_shape.x / 2.0 - dx;
+    let oy = a_shape.y / 2.0 + b_shape.y / 2.0 - dy;
 
     AABBCollisionResult {
         collision_axes: (ox > 0.0, oy > 0.0),
