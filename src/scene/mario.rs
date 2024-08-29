@@ -52,21 +52,32 @@ impl MarioScene {
         }
     }
 
-    fn draw_axes(&self, d: &mut RaylibDrawHandle) {
-        d.draw_line(
-            self.center.0,
-            0,
-            self.center.0,
-            WINDOW_HEIGHT as i32,
-            Color::RED,
+    fn draw_grid(&self, d: &mut RaylibDrawHandle) {
+        let cell_size = 64.0;
+        let num_lines = Vec2::new(
+            WINDOW_WIDTH as f32 / cell_size,
+            WINDOW_HEIGHT as f32 / cell_size,
         );
-        d.draw_line(
-            0,
-            self.center.1,
-            WINDOW_WIDTH as i32,
-            self.center.1,
-            Color::RED,
-        );
+
+        for i in 0..num_lines.x as i32 {
+            let x = i * cell_size as i32;
+            d.draw_line(x, 0, x, WINDOW_HEIGHT as i32, Color::RED);
+        }
+        for i in 0..num_lines.y as i32 {
+            let y = i * cell_size as i32;
+            d.draw_line(0, y, WINDOW_WIDTH as i32, y, Color::RED);
+        }
+        for x in 0..num_lines.x as i32 {
+            for y in 0..num_lines.y as i32 {
+                d.draw_text(
+                    format!("({}, {})", x, num_lines.y as i32 - y).as_str(),
+                    x * cell_size as i32,
+                    y * cell_size as i32,
+                    15,
+                    Color::GREEN,
+                );
+            }
+        }
     }
 
     fn move_entities(entities: &mut Vec<Rc<RefCell<Entity>>>, dt: f32) {
@@ -346,17 +357,14 @@ impl MarioScene {
 
     fn spawn_ground(entity_manager: &mut EntityManager) {
         let floor_tex_size = 64.0;
-        let floor_size: f32 = 100.0;
+        let floor_size: f32 = 64.0;
         let half_size = floor_size / 2.0;
         let brick_count = WINDOW_WIDTH / floor_size as u32;
 
         for i in 0..brick_count {
             let e = entity_manager.add_entity("Brick".to_string());
             e.borrow_mut().c_transform = CTransform {
-                position: Vec2::new(
-                    i as f32 * floor_size + half_size,
-                    WINDOW_HEIGHT as f32 - half_size,
-                ),
+                position: Vec2::new(i as f32 * floor_size + half_size, 64.0 * 12.0 + half_size),
                 velocity: Vec2::new(0.0, 0.0),
                 ..Default::default()
             };
@@ -378,10 +386,7 @@ impl MarioScene {
 
         let e = entity_manager.add_entity("Brick".to_string());
         e.borrow_mut().c_transform = CTransform {
-            position: Vec2::new(
-                WINDOW_WIDTH as f32 / 2.0 + half_size - 200.0,
-                WINDOW_HEIGHT as f32 / 2.0 - half_size,
-            ),
+            position: Vec2::new(64.0 * 5.0 + half_size, 64.0 * 6.0 + half_size),
             velocity: Vec2::new(0.0, 0.0),
             ..Default::default()
         };
@@ -408,7 +413,7 @@ impl Scene for MarioScene {
 
         d.clear_background(Color::BLACK);
         d.draw_fps(12, 12);
-        self.draw_axes(&mut d);
+        self.draw_grid(&mut d);
         if let Some(entities) = self.entity_manager.get_entities(None) {
             MarioScene::move_entities(entities, dt);
         }
