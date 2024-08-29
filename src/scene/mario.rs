@@ -2,9 +2,10 @@ use std::{cell::RefCell, rc::Rc};
 
 use glam::Vec2;
 use raylib::{
+    camera::Camera2D,
     color::Color,
     ffi::{KeyboardKey, Rectangle, Vector2},
-    prelude::{RaylibDraw, RaylibDrawHandle},
+    prelude::{RaylibDraw, RaylibDrawHandle, RaylibMode2D, RaylibMode2DExt},
     RaylibHandle, RaylibThread,
 };
 
@@ -28,8 +29,12 @@ type Player = Rc<RefCell<Entity>>;
 pub struct MarioScene {
     pub entity_manager: EntityManager,
     asset_manager: Rc<AssetManager>,
+    camera: Camera2D,
+    box_trap: (f32, f32),
+    box_trap_range: f32,
     player: Player,
     center: (i32, i32),
+    grid: bool,
     offset: f32,
     cd: f32,
 }
@@ -42,6 +47,13 @@ impl MarioScene {
         let player = MarioScene::spawn_player(&mut entity_manager);
         MarioScene::spawn_ground(&mut entity_manager);
 
+        let camera = Camera2D {
+            target: raylib::math::Vector2 { x: 0.0, y: 0.0 },
+            offset: raylib::math::Vector2 { x: 0.0, y: 0.0 },
+            rotation: 0.0,
+            zoom: 1.0,
+        };
+
         MarioScene {
             entity_manager,
             asset_manager,
@@ -49,10 +61,51 @@ impl MarioScene {
             center,
             offset: 0.0,
             cd: 0.0,
+            grid: false,
+            camera,
+            box_trap: (300.0, 600.0),
+            box_trap_range: 300.0,
         }
     }
 
-    fn draw_grid(&self, d: &mut RaylibDrawHandle) {
+    fn camera_trap_update(&mut self, d: &mut RaylibMode2D<RaylibDrawHandle>) {
+        let box_trap = &mut self.box_trap;
+
+        let player_pos = self.player.borrow().c_transform.position;
+        let player_vec = self.player.borrow().c_transform.velocity.x;
+        if player_pos.x > box_trap.1 && player_vec > 0.0 {
+            box_trap.1 = player_pos.x;
+            box_trap.0 = box_trap.1 - self.box_trap_range;
+        }
+
+        if player_pos.x < box_trap.0 && player_vec < 0.0 {
+            box_trap.0 = player_pos.x;
+            box_trap.1 = box_trap.0 + self.box_trap_range;
+        }
+
+        //d.draw_line(
+        //    box_trap.0 as i32,
+        //    0,
+        //    box_trap.0 as i32,
+        //    WINDOW_HEIGHT as i32,
+        //    Color::RED,
+        //);
+        //d.draw_line(
+        //    box_trap.1 as i32,
+        //    0,
+        //    box_trap.1 as i32,
+        //    WINDOW_HEIGHT as i32,
+        //    Color::RED,
+        //);
+
+        self.camera.target.x = box_trap.0 - self.box_trap_range;
+    }
+
+    fn draw_grid(&self, d: &mut RaylibMode2D<RaylibDrawHandle>) {
+        if !self.grid {
+            return;
+        }
+
         let cell_size = 64.0;
         let num_lines = Vec2::new(
             WINDOW_WIDTH as f32 / cell_size,
@@ -150,18 +203,23 @@ impl MarioScene {
         };
     }
 
-    fn input_receiving(rl: &mut RaylibHandle, player: &Player) {
-        let player_input = &mut player.borrow_mut().c_input;
+    //fn input_receiving(&mut self, rl: &mut RaylibHandle, player: &Player) {
+    fn input_receiving(&mut self, rl: &mut RaylibHandle) {
+        let player_input = &mut self.player.borrow_mut().c_input;
         player_input.left = rl.is_key_down(KeyboardKey::KEY_LEFT);
         player_input.right = rl.is_key_down(KeyboardKey::KEY_RIGHT);
         player_input.up = rl.is_key_pressed(KeyboardKey::KEY_UP);
         player_input.down = rl.is_key_down(KeyboardKey::KEY_DOWN);
+
+        if rl.is_key_released(KeyboardKey::KEY_G) {
+            self.grid = !self.grid;
+        }
     }
 
     fn render(
         entities: &Vec<Rc<RefCell<Entity>>>,
         asset_manager: &Rc<AssetManager>,
-        d: &mut RaylibDrawHandle,
+        d: &mut RaylibMode2D<RaylibDrawHandle>,
     ) {
         for e in entities.iter() {
             // animation
@@ -221,7 +279,7 @@ impl MarioScene {
     fn collision_detection(entities: &mut Vec<Rc<RefCell<Entity>>>, player: &Player) {
         // Check collision of player against everything
         for e in entities.iter_mut() {
-            if !e.borrow().is_alive() {
+            if !e.borrow().is_alive() || !e.borrow().c_bbox.enabled {
                 continue;
             }
 
@@ -343,6 +401,7 @@ impl MarioScene {
                 color: Color::WHITE,
             };
             p.c_bbox = CBBox {
+                enabled: true,
                 shape: Shape::Rectangle(player_size - 25.0, player_size - 25.0),
                 ..Default::default()
             };
@@ -359,7 +418,7 @@ impl MarioScene {
         let floor_tex_size = 64.0;
         let floor_size: f32 = 64.0;
         let half_size = floor_size / 2.0;
-        let brick_count = WINDOW_WIDTH / floor_size as u32;
+        let brick_count = 2 * WINDOW_WIDTH / floor_size as u32;
 
         for i in 0..brick_count {
             let e = entity_manager.add_entity("Brick".to_string());
@@ -379,6 +438,7 @@ impl MarioScene {
                 color: Color::RED,
             };
             e.borrow_mut().c_bbox = CBBox {
+                enabled: true,
                 shape: Shape::Rectangle(floor_size, floor_size),
                 ..Default::default()
             };
@@ -386,17 +446,17 @@ impl MarioScene {
 
         let e = entity_manager.add_entity("Brick".to_string());
         e.borrow_mut().c_transform = CTransform {
-            position: Vec2::new(64.0 * 5.0 + half_size, 64.0 * 6.0 + half_size),
+            position: Vec2::new(64.0 * 5.0 + half_size, 64.0 * 11.0 + half_size),
             velocity: Vec2::new(0.0, 0.0),
             ..Default::default()
         };
         e.borrow_mut().c_shape = CShape {
-            shape: Shape::Rectangle(floor_size, floor_size),
+            shape: Shape::RectText(83.3, 280.0, 38.08, 128.0, "coinspin"),
             color: Color::RED,
         };
-        e.borrow_mut().c_bbox = CBBox {
-            shape: Shape::Rectangle(floor_size, floor_size),
-            ..Default::default()
+        e.borrow_mut().c_animation = CAnimation {
+            enabled: true,
+            animation: Animation::new(18, 3),
         };
     }
 }
@@ -404,16 +464,19 @@ impl MarioScene {
 impl Scene for MarioScene {
     fn update(&mut self, rl: &mut RaylibHandle, thread: &mut RaylibThread) {
         self.entity_manager.update();
-        MarioScene::input_receiving(rl, &self.player);
+        self.input_receiving(rl);
         MarioScene::player_movement(&self.player);
         MarioScene::player_animation(&self.player);
 
         let dt = rl.get_frame_time();
         let mut d = rl.begin_drawing(&thread);
+        let mut d: RaylibMode2D<RaylibDrawHandle> = d.begin_mode2D(self.camera);
 
-        d.clear_background(Color::BLACK);
+        d.clear_background(Color::new(155, 150, 240, 255));
         d.draw_fps(12, 12);
         self.draw_grid(&mut d);
+        self.camera_trap_update(&mut d);
+
         if let Some(entities) = self.entity_manager.get_entities(None) {
             MarioScene::move_entities(entities, dt);
         }
