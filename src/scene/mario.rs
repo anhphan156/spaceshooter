@@ -28,15 +28,15 @@ type Player = Rc<RefCell<Entity>>;
 #[allow(dead_code)]
 pub struct MarioScene {
     pub entity_manager: EntityManager,
-    asset_manager: Rc<AssetManager>,
-    camera: Camera2D,
-    box_trap: (f32, f32),
-    box_trap_range: f32,
-    player: Player,
-    center: (i32, i32),
-    grid: bool,
-    offset: f32,
-    cd: f32,
+    asset_manager:      Rc<AssetManager>,
+    camera:             Camera2D,
+    box_trap:           (f32, f32),
+    box_trap_range:     f32,
+    player:             Player,
+    center:             (i32, i32),
+    grid:               bool,
+    offset:             f32,
+    cd:                 f32,
 }
 
 impl MarioScene {
@@ -48,23 +48,23 @@ impl MarioScene {
         MarioScene::spawn_ground(&mut entity_manager);
 
         let camera = Camera2D {
-            target: raylib::math::Vector2 { x: 0.0, y: 0.0 },
-            offset: raylib::math::Vector2 { x: 0.0, y: 0.0 },
+            target:   raylib::math::Vector2 { x: 0.0, y: 0.0 },
+            offset:   raylib::math::Vector2 { x: 0.0, y: 0.0 },
             rotation: 0.0,
-            zoom: 1.0,
+            zoom:     1.0,
         };
 
         MarioScene {
+            offset: 0.0,
+            cd: 0.0,
+            grid: false,
+            box_trap: (300.0, 600.0),
+            box_trap_range: 300.0,
+            camera,
             entity_manager,
             asset_manager,
             player,
             center,
-            offset: 0.0,
-            cd: 0.0,
-            grid: false,
-            camera,
-            box_trap: (300.0, 600.0),
-            box_trap_range: 300.0,
         }
     }
 
@@ -107,10 +107,7 @@ impl MarioScene {
         }
 
         let cell_size = 64.0;
-        let num_lines = Vec2::new(
-            WINDOW_WIDTH as f32 / cell_size,
-            WINDOW_HEIGHT as f32 / cell_size,
-        );
+        let num_lines = Vec2::new(WINDOW_WIDTH as f32 / cell_size, WINDOW_HEIGHT as f32 / cell_size);
 
         for i in 0..num_lines.x as i32 {
             let x = i * cell_size as i32;
@@ -122,13 +119,7 @@ impl MarioScene {
         }
         for x in 0..num_lines.x as i32 {
             for y in 0..num_lines.y as i32 {
-                d.draw_text(
-                    format!("({}, {})", x, num_lines.y as i32 - y).as_str(),
-                    x * cell_size as i32,
-                    y * cell_size as i32,
-                    15,
-                    Color::GREEN,
-                );
+                d.draw_text(format!("({}, {})", x, num_lines.y as i32 - y).as_str(), x * cell_size as i32, y * cell_size as i32, 15, Color::GREEN);
             }
         }
     }
@@ -162,7 +153,7 @@ impl MarioScene {
             player_velocity.y = -1000.0;
         } else {
             player_velocity.y += 10.0;
-            player_velocity.y = f32::min(300.0, player_velocity.y);
+            player_velocity.y = f32::min(700.0, player_velocity.y);
         };
     }
 
@@ -192,11 +183,7 @@ impl MarioScene {
         player.c_animation.enabled = animation_enabled;
         match player.c_shape.shape {
             Shape::RectText(_, _, c, d, _) => {
-                let (a, b) = if animation_name.eq("mega_stand") {
-                    (190.0, 208.0)
-                } else {
-                    (246.0, 246.0)
-                };
+                let (a, b) = if animation_name.eq("mega_stand") { (190.0, 208.0) } else { (246.0, 246.0) };
                 player.c_shape.shape = Shape::RectText(a, b, c, d, animation_name)
             }
             _ => {}
@@ -216,11 +203,7 @@ impl MarioScene {
         }
     }
 
-    fn render(
-        entities: &Vec<Rc<RefCell<Entity>>>,
-        asset_manager: &Rc<AssetManager>,
-        d: &mut RaylibMode2D<RaylibDrawHandle>,
-    ) {
+    fn render(entities: &Vec<Rc<RefCell<Entity>>>, asset_manager: &Rc<AssetManager>, d: &mut RaylibMode2D<RaylibDrawHandle>) {
         for e in entities.iter() {
             // animation
             let is_animation_enabled = e.borrow().c_animation.enabled;
@@ -236,39 +219,24 @@ impl MarioScene {
             let position = e.c_transform.position;
             let forward = e.c_state.forward;
             match e.c_shape.shape {
-                Shape::Circle(r) => {
-                    d.draw_circle(position.x as i32, position.y as i32, r, e.c_shape.color)
-                }
-                Shape::Rectangle(w, h) => d.draw_rectangle(
-                    position.x as i32 - w as i32 / 2,
-                    position.y as i32 - h as i32 / 2,
-                    w as i32,
-                    h as i32,
-                    e.c_shape.color,
-                ),
+                Shape::Circle(r) => d.draw_circle(position.x as i32, position.y as i32, r, e.c_shape.color),
+                Shape::Rectangle(w, h) => d.draw_rectangle(position.x as i32 - w as i32 / 2, position.y as i32 - h as i32 / 2, w as i32, h as i32, e.c_shape.color),
                 Shape::RectText(src_w, src_h, dst_w, dst_h, texture_tag) => {
                     if let Some(t) = asset_manager.textures.get(&texture_tag.to_string()) {
-                        let src_x = if is_animation_enabled {
-                            e.c_animation.animation.anim_frame as f32
-                        } else {
-                            0.0
-                        };
+                        let src_x = if is_animation_enabled { e.c_animation.animation.anim_frame as f32 } else { 0.0 };
                         let src_rec = Rectangle {
-                            x: src_x * src_w,
-                            y: 0.0,
-                            width: src_w * if forward { 1.0 } else { -1.0 },
+                            x:      src_x * src_w,
+                            y:      0.0,
+                            width:  src_w * if forward { 1.0 } else { -1.0 },
                             height: src_h,
                         };
                         let dst_rec = Rectangle {
-                            x: position.x,
-                            y: position.y,
-                            width: dst_w,
+                            x:      position.x,
+                            y:      position.y,
+                            width:  dst_w,
                             height: dst_h,
                         };
-                        let origin = Vector2 {
-                            x: dst_w / 2.0,
-                            y: dst_h / 2.0,
-                        };
+                        let origin = Vector2 { x: dst_w / 2.0, y: dst_h / 2.0 };
 
                         d.draw_texture_pro(t, src_rec, dst_rec, origin, 0.0, Color::WHITE);
                     }
@@ -292,24 +260,14 @@ impl MarioScene {
                     let prev_player_position = player_borrowed.c_transform.prev_position;
                     let e_position = e.borrow().c_transform.position;
 
-                    let result = physics::aabb_collision_detection(
-                        player_position,
-                        e_position,
-                        Vec2::new(pw, ph),
-                        Vec2::new(ew, eh),
-                    );
+                    let result = physics::aabb_collision_detection(player_position, e_position, Vec2::new(pw, ph), Vec2::new(ew, eh));
 
                     let player_bbox = &mut player_borrowed.c_bbox;
                     if result.is_collided() {
                         player_bbox.collision_axes = result.collision_axes;
                         player_bbox.overlapped_shape = result.overlapped_shape;
 
-                        let prev_result = physics::aabb_collision_detection(
-                            prev_player_position,
-                            e_position,
-                            Vec2::new(pw, ph),
-                            Vec2::new(ew, eh),
-                        );
+                        let prev_result = physics::aabb_collision_detection(prev_player_position, e_position, Vec2::new(pw, ph), Vec2::new(ew, eh));
                         player_bbox.prev_collision_axes = prev_result.collision_axes;
 
                         break;
@@ -406,7 +364,7 @@ impl MarioScene {
                 ..Default::default()
             };
             p.c_animation = CAnimation {
-                enabled: true,
+                enabled:   true,
                 animation: Animation::new(18, 3),
             }
         }
@@ -428,13 +386,7 @@ impl MarioScene {
                 ..Default::default()
             };
             e.borrow_mut().c_shape = CShape {
-                shape: Shape::RectText(
-                    floor_tex_size,
-                    floor_tex_size,
-                    floor_size,
-                    floor_size,
-                    "ground",
-                ),
+                shape: Shape::RectText(floor_tex_size, floor_tex_size, floor_size, floor_size, "ground"),
                 color: Color::RED,
             };
             e.borrow_mut().c_bbox = CBBox {
@@ -455,7 +407,7 @@ impl MarioScene {
             color: Color::RED,
         };
         e.borrow_mut().c_animation = CAnimation {
-            enabled: true,
+            enabled:   true,
             animation: Animation::new(18, 3),
         };
     }
@@ -488,13 +440,7 @@ impl Scene for MarioScene {
 
         if let Some(entities) = self.entity_manager.get_entities(None) {
             MarioScene::render(entities, &self.asset_manager, &mut d);
-            d.draw_text(
-                format!("{}", entities.len()).as_str(),
-                self.center.0,
-                0,
-                30,
-                Color::RED,
-            );
+            d.draw_text(format!("{}", entities.len()).as_str(), self.center.0, 0, 30, Color::RED);
         }
     }
 }

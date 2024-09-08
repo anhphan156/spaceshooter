@@ -26,7 +26,7 @@
         };
 
         clang_lib = with pkgs; [
-          libclang 
+          libclang
         ];
 
         x11_lib = with pkgs; [
@@ -54,8 +54,9 @@
               glfw
               glfw-wayland
               glxinfo
+              clang
             ];
-            buildInputs = [ pkgs.clang ] ++ clang_lib ++ x11_lib ;
+            buildInputs = clang_lib ++ x11_lib;
           };
         }
     );
